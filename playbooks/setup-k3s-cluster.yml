@@ -1,0 +1,39 @@
+---
+# Main k3s setup playbook.
+
+- name: "Setup a k3s single node cluster the easy way"
+  hosts: "k3s"
+  gather_facts: true
+  roles:
+  tasks:
+    - name: Update system
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 180
+        upgrade: dist
+
+    - name: Install dependencies
+      ansible.builtin.package:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg-agent
+          - software-properties-common
+        state: latest
+
+    - name: Get k3s installation script
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /tmp/setup_k3s.sh
+        mode: 0755
+
+    - name: Install k3s
+      ansible.builtin.command: /tmp/setup_k3s.sh
+
+    - name: Wait till node is ready
+      ansible.builtin.command: "kubectl wait --for=condition=Ready nodes --all --timeout=600s"
+      register: SETUP_RESULT
+      until: SETUP_RESULT.rc == 0
+      retries: 2
+      delay: 5
