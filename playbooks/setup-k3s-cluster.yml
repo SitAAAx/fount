@@ -23,7 +23,7 @@
               - gnupg-agent
               - software-properties-common
             state: latest
-      when: false
+      when: true
 
     - name: Kubernetes Setup
       block:
@@ -42,7 +42,7 @@
           until: SETUP_RESULT.rc == 0
           retries: 2
           delay: 5
-      when: false
+      when: true
 
     - name: Copy Charts/Configuration - TODO (optional) copy kube.conf to local and use it
       block:
@@ -62,7 +62,7 @@
             kubectl apply --filename=/root/k3s/000-cluster/{{ item | basename }} && sleep 3"
           loop:
             - "../../cluster-configs/dev/k3s/000-cluster/00-namespace.yml"
-            - "../../cluster-configs/dev/k3s/000-cluster/01-cert-manager-v0.11.0.yml"
+            - "../../cluster-configs/dev/k3s/000-cluster/01-cert-manager-v1.2.0.yml"
 
         - name: Wait till cert-manager pods become ready
           ansible.builtin.command: "kubectl wait --namespace=cert-manager --for=condition=Ready pods --all --timeout=600s"
