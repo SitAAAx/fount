@@ -23,7 +23,7 @@
               - gnupg-agent
               - software-properties-common
             state: latest
-      when: true
+      when: false
 
     - name: Kubernetes Setup
       block:
@@ -37,41 +37,42 @@
           ansible.builtin.command: /tmp/setup_k3s.sh
 
         - name: Wait till node is ready
-          ansible.builtin.command: "kubectl wait --for=condition=Ready nodes --all --timeout=600s"
+          ansible.builtin.command: "kubectl wait --for=condition=Ready nodes --all --timeout=60s"
           register: SETUP_RESULT
           until: SETUP_RESULT.rc == 0
-          retries: 2
-          delay: 5
-      when: true
+          retries: 5
+      when: false
 
-    - name: Copy Charts/Configuration - TODO (optional) copy kube.conf to local and use it
+    - name: Make remote cluster locally accessible
       block:
-        - name: Copy configuration directory
-          ansible.posix.synchronize:
-            src: ../../cluster-configs/dev/k3s
-            dest: /root/
-            delete: yes
-            recursive: yes
-      when: true
+        - name: Fetch remote "kube.conf"
+          ansible.builtin.fetch:
+            src: /etc/rancher/k3s/k3s.yaml
+            dest: "{{ cluster_config_filepath }}"
+            flat: yes
+
+        - name: Set the remote server url in the config
+          local_action: ansible.builtin.command kubectl --kubeconfig={{ cluster_config_filepath }} config set clusters.default.server https://{{ ansible_host }}:6443
+      when: false
 
     - name: Setup cert-manager
       block:
-        - name: Apply namespace and cert-manager
-          ansible.builtin.shell:
-            "kubectl apply --dry-run=client --filename=/root/k3s/000-cluster/{{ item | basename }} && \
-            kubectl apply --filename=/root/k3s/000-cluster/{{ item | basename }} && sleep 3"
-          loop:
-            - "../../cluster-configs/dev/k3s/000-cluster/00-namespace.yml"
-            - "../../cluster-configs/dev/k3s/000-cluster/01-cert-manager-v1.2.0.yml"
+        - name: Add Cert-Manager Repository to Local Helm
+          local_action: ansible.builtin.command helm repo add jetstack https://charts.jetstack.io
+
+        - name: Update Local Helm Repository
+          local_action: ansible.builtin.command helm repo update
+
+        # TODO
+        # * install CRDs only once!
+        - name: Install Cert-Manager via Helm Chart
+          local_action: ansible.builtin.command helm install cert-manager jetstack/cert-manager --kubeconfig={{ cluster_config_filepath }} --namespace {{ cert_manager_namespace }} --version {{ cert_manager_version }} --create-namespace --set installCRDs=true
 
         - name: Wait till cert-manager pods become ready
-          ansible.builtin.command: "kubectl wait --namespace=cert-manager --for=condition=Ready pods --all --timeout=600s"
-          register: CERT_MANAGER_PODS_READY_RESPONSE
+          local_action: ansible.builtin.command kubectl --kubeconfig={{ cluster_config_filepath }} wait --namespace={{ cert_manager_namespace }} --for=condition=Ready pods --all --timeout=120s
 
+        # TODO
+        # * make configurabe: mail addr, ingress class, server
         - name: Apply cluster-issuer
-          ansible.builtin.shell:
-            "kubectl apply --dry-run=client --filename=/root/k3s/000-cluster/{{ item | basename }} && \
-            kubectl apply --filename=/root/k3s/000-cluster/{{ item | basename }} && sleep 3"
-          loop:
-            - "../../cluster-configs/dev/k3s/000-cluster/05-cluster-issuer.yml"
-      when: true
+          local_action: ansible.builtin.command kubectl --kubeconfig={{ cluster_config_filepath }} apply --filename={{ playbook_dir }}/../cluster-configs/dev/k3s/000-cluster/05-cluster-issuer.yml
+      when: false
