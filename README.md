@@ -11,6 +11,7 @@ In order to be able to experiment with _FOUNT_, the following hardware requireme
 - Debian based (e.g. Ubuntu) machine with at least 1GB of ram and one core - for _Gitlab_ **4 cores** and **4GB of memory** are recommended.
 - A _DNS_ record that points to the public _IP_ address of the machine.
 - A _SSH_ connection to the machine - preferably using _Public Key Authentication_.
+- A local `kubectl` and `helm` installation.
 
 Additionally _FOUNT_ uses _Ansible_ for the setup and configuration.
 If _Python 3_ is installed you can easily install _Ansible_ via _Pip_.
@@ -49,3 +50,4 @@ If the node reached the _Ready_ status your cluster is up and running :tada:
 ## Sources and further information
 
 - [K3s setup guide](https://rancher.com/docs/k3s/latest/en/installation/install-options/)
+- [Cert-Manager setup guide](https://cert-manager.io/docs/installation/kubernetes/)
