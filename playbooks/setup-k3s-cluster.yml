@@ -6,34 +6,73 @@
   gather_facts: true
   roles:
   tasks:
-    - name: Update system
-      ansible.builtin.apt:
-        update_cache: yes
-        cache_valid_time: 180
-        upgrade: dist
+    - name: System preparation
+      block:
+        - name: Update system
+          ansible.builtin.apt:
+            update_cache: yes
+            cache_valid_time: 180
+            upgrade: dist
 
-    - name: Install dependencies
-      ansible.builtin.package:
-        name:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - gnupg-agent
-          - software-properties-common
-        state: latest
+        - name: Install dependencies
+          ansible.builtin.package:
+            name:
+              - apt-transport-https
+              - ca-certificates
+              - curl
+              - gnupg-agent
+              - software-properties-common
+            state: latest
+      when: false
 
-    - name: Get k3s installation script
-      ansible.builtin.get_url:
-        url: https://get.k3s.io
-        dest: /tmp/setup_k3s.sh
-        mode: 0755
+    - name: Kubernetes Setup
+      block:
+        - name: Get k3s installation script
+          ansible.builtin.get_url:
+            url: https://get.k3s.io
+            dest: /tmp/setup_k3s.sh
+            mode: 0755
 
-    - name: Install k3s
-      ansible.builtin.command: /tmp/setup_k3s.sh
+        - name: Install k3s
+          ansible.builtin.command: /tmp/setup_k3s.sh
 
-    - name: Wait till node is ready
-      ansible.builtin.command: "kubectl wait --for=condition=Ready nodes --all --timeout=600s"
-      register: SETUP_RESULT
-      until: SETUP_RESULT.rc == 0
-      retries: 2
-      delay: 5
+        - name: Wait till node is ready
+          ansible.builtin.command: "kubectl wait --for=condition=Ready nodes --all --timeout=60s"
+          register: SETUP_RESULT
+          until: SETUP_RESULT.rc == 0
+          retries: 5
+      when: false
+
+    - name: Make remote cluster locally accessible
+      block:
+        - name: Fetch remote "kube.conf"
+          ansible.builtin.fetch:
+            src: /etc/rancher/k3s/k3s.yaml
+            dest: "{{ cluster_config_filepath }}"
+            flat: yes
+
+        - name: Set the remote server url in the config
+          local_action: ansible.builtin.command kubectl --kubeconfig={{ cluster_config_filepath }} config set clusters.default.server https://{{ ansible_host }}:6443
+      when: false
+
+    - name: Setup cert-manager
+      block:
+        - name: Add Cert-Manager Repository to Local Helm
+          local_action: ansible.builtin.command helm repo add jetstack https://charts.jetstack.io
+
+        - name: Update Local Helm Repository
+          local_action: ansible.builtin.command helm repo update
+
+        # TODO
+        # * install CRDs only once!
+        - name: Install Cert-Manager via Helm Chart
+          local_action: ansible.builtin.command helm install cert-manager jetstack/cert-manager --kubeconfig={{ cluster_config_filepath }} --namespace {{ cert_manager_namespace }} --version {{ cert_manager_version }} --create-namespace --set installCRDs=true
+
+        - name: Wait till cert-manager pods become ready
+          local_action: ansible.builtin.command kubectl --kubeconfig={{ cluster_config_filepath }} wait --namespace={{ cert_manager_namespace }} --for=condition=Ready pods --all --timeout=120s
+
+        # TODO
+        # * make configurabe: mail addr, ingress class, server
+        - name: Apply cluster-issuer
+          local_action: ansible.builtin.command kubectl --kubeconfig={{ cluster_config_filepath }} apply --filename={{ playbook_dir }}/../cluster-configs/dev/k3s/000-cluster/05-cluster-issuer.yml
+      when: false
