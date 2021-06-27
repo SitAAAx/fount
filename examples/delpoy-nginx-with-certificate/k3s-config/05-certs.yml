@@ -1,0 +1,17 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: example-nginx
+  namespace: examples
+spec:
+  secretName: example-nginx-tls
+  duration: 2160h # 90d
+  renewBefore: 360h # 15d
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  isCA: false
+  commonName: nginx.examples.k3s.l4b.space
+  dnsNames:
+    - nginx.examples.k3s.l4b.space
