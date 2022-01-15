@@ -1,0 +1,22 @@
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: docker-registry
+  labels:
+    app: docker-registry
+  annotations:
+    traefik.ingress.kubernetes.io/redirect-entry-point: https
+spec:
+  rules:
+    - host: registry.k3s.l4b.space
+      http:
+        paths:
+          - backend:
+              serviceName: docker-registry
+              servicePort: 5000
+            path: /
+  tls:
+    - hosts:
+        - registry.k3s.l4b.space
+      secretName: docker-registry-tls

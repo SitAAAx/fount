@@ -1,0 +1,53 @@
+# TODO: source: https://carpie.net/articles/installing-docker-registry-on-k3s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-registry
+  labels:
+    app: docker-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docker-registry
+  template:
+    metadata:
+      labels:
+        app: docker-registry
+    spec:
+      containers:
+        - name: docker-registry
+          image: registry
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: storage
+              mountPath: /var/lib/registry
+          #            - name: htpasswd
+          #              mountPath: /auth
+          #              readOnly: true
+          #          env:
+          # TODO: TRY BASIC AUTH ON INGRESS INSTEAD OF ENV: https://imti.co/kubernetes-ingress-basic-auth/    if not possible create kubernetes.io/basic-auth SECRET
+          #            - name: REGISTRY_AUTH
+          #              value: htpasswd
+          #            - name: REGISTRY_AUTH_HTPASSWD_REALM
+          #              value: Docker Registry
+          #            - name: REGISTRY_AUTH_HTPASSWD_PATH
+          #              value: /auth/htpasswd
+          # TODO MOVE TO ConfigMap
+          #            - name: REGISTRY_STORAGE_DELETE_ENABLED
+          #              value: "true"
+          resources:
+            requests:
+              memory: 256M
+              cpu: 500m
+            limits:
+              memory: 256M
+              cpu: 500m
+      volumes:
+        - name: storage
+          emptyDir: {} # TODO PERSISTENT VOLUME CLAIM YML
+#        - name: htpasswd
+#          secret:
+#            secretName: docker-registry-htpasswd
